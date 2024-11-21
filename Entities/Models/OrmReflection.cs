@@ -15,36 +15,9 @@ namespace Entities.Models
     {
         private static SqlConnection? DatabaseConnection = null;
 
-        public static int Insert_Reflection<T>(this T DatabaseObject)
-        {  
-            Type DatabaseObjectType = typeof(T);
-            Type DatabaseObjectType1 = DatabaseObject.GetType();
-
-            //PropertyInfo PropertyInfoObject = null;
-            PropertyInfo[] PropertyInfos = DatabaseObjectType.GetProperties();
-            PropertyInfo[] PropertyInfos1 = DatabaseObjectType1.GetProperties(BindingFlags.Instance | BindingFlags.Public);
-
-            foreach (PropertyInfo propertyInfo in PropertyInfos1)
-            {
-                Console.Write(propertyInfo.Name + " : ");
-                //PropertyInfoObject = DatabaseObjectType.GetProperty(name: propertyInfo.Name, bindingAttr: BindingFlags.Instance | BindingFlags.Public);
-                Console.WriteLine(propertyInfo.GetValue(DatabaseObject));
-            }
-            //foreach (PropertyInfo propertyInfo in PropertyInfos)
-            foreach (var propertyInfo in PropertyInfos)
-            {
-                Console.Write(propertyInfo.Name);
-                //PropertyInfoObject = DatabaseObjectType.GetProperty(name: propertyInfo.Name, bindingAttr: BindingFlags.Instance | BindingFlags.Public);
-                Console.WriteLine(propertyInfo.GetValue(DatabaseObjectType));
-            }
-
-            return 0; 
-        }
-
         public static int InsertObjectToDatabase<T>(this T obj, string tableName)
         {
             int Result = 0;
-            // Get the type of the object
             Type type = typeof(T);
 
             // Get all public instance properties
@@ -56,12 +29,10 @@ namespace Entities.Models
             StringBuilder sql = new StringBuilder();
             sql.Append($"INSERT INTO {tableName} (");
 
-            // Build the column list and parameter placeholders
             List<string> columnNames = new List<string>();
             List<object> parameters = new List<object>();
             foreach (PropertyInfo property in properties)
             {
-                // Filter properties based on your criteria (e.g., exclude navigation properties)
                 if (property != primaryKeyProperty && (property.PropertyType.IsPrimitive || property.PropertyType == typeof(string)))
                 {
                     columnNames.Add(property.Name);
@@ -74,18 +45,15 @@ namespace Entities.Models
             sql.Append(string.Join(", ", parameters.Select(p => "@p" + parameters.IndexOf(p))));
             sql.Append(");");
 
-            // Execute the SQL query with parameters
             using (SqlConnection connection = new SqlConnection(GetSqlConnectionString()))
             {
-                using (SqlCommand command = new SqlCommand(sql.ToString(),
-                        connection))
+                using (SqlCommand command = new SqlCommand(sql.ToString(), connection))
                 {
                     for (int i = 0; i < parameters.Count; i++)
                     {
                         command.Parameters.AddWithValue("@p" + i, parameters[i]);
                     }
 
-                    //OpenDatabaseConnection();
                     connection.Open();
                     Result = command.ExecuteNonQuery();
                     if (Result < 0)
@@ -93,11 +61,171 @@ namespace Entities.Models
                         Console.WriteLine("Noget gik galt under Save operationen !!!");
                     }
                 }
-                //CloseDatabaseConnection();
                 connection.Close();
             }
 
             return Result;
+        }
+
+        public static int DeleteObjectFromDatabase<T>(this T obj, string tableName)
+        {
+            int Result = 0;
+            Type type = typeof(T);
+
+            PropertyInfo[] properties = type.GetProperties();
+
+            PropertyInfo primaryKeyProperty = properties.FirstOrDefault(p => p.GetCustomAttributes(typeof(KeyAttribute), true).Length > 0);
+            if (primaryKeyProperty == null)
+            {
+                Console.WriteLine("Ingen primary key fundet !");
+                return Result;
+            }
+
+            object primaryKeyValue = primaryKeyProperty.GetValue(obj);
+
+            if (primaryKeyValue == null)
+            {
+                Console.WriteLine("Primary key value er null.");
+                return Result;
+            }
+
+            StringBuilder sql = new StringBuilder();
+            sql.Append($"DELETE FROM {tableName} WHERE {primaryKeyProperty.Name} = @p0;");
+
+            using (SqlConnection connection = new SqlConnection(GetSqlConnectionString()))
+            {
+                using (SqlCommand command = new SqlCommand(sql.ToString(), connection))
+                {
+                    command.Parameters.AddWithValue("@p0", primaryKeyValue);
+
+                    try
+                    {
+                        connection.Open();
+                        Result = command.ExecuteNonQuery();
+                        if (Result < 0)
+                        {
+                            Console.WriteLine("Noget gik galt under Save operationen !!!");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Exception occurred: {ex.Message}");
+                    }
+                }
+            }
+
+            return Result;
+        }
+
+        public static int UpdateObjectInDatabase<T>(this T obj, string tableName)
+        {
+            int Result = 0;
+            Type type = typeof(T);
+
+            PropertyInfo[] properties = type.GetProperties();
+
+            PropertyInfo primaryKeyProperty = properties.FirstOrDefault(p => p.GetCustomAttributes(typeof(KeyAttribute), true).Length > 0);
+            if (primaryKeyProperty == null)
+            {
+                Console.WriteLine("Ingen primary key fundet !");
+                return Result;
+            }
+
+            object primaryKeyValue = primaryKeyProperty.GetValue(obj);
+            if (primaryKeyValue == null)
+            {
+                Console.WriteLine("Primary key value er null.");
+                return Result;
+            }
+
+            StringBuilder sql = new StringBuilder();
+            sql.Append($"UPDATE {tableName} SET ");
+
+            List<string> setClauses = new List<string>();
+            List<object> parameters = new List<object>();
+            foreach (PropertyInfo property in properties)
+            {
+                if (property != primaryKeyProperty && (property.PropertyType.IsPrimitive || property.PropertyType == typeof(string)))
+                {
+                    setClauses.Add($"{property.Name} = @p{parameters.Count}");
+                    parameters.Add(property.GetValue(obj));
+                }
+            }
+
+            sql.Append(string.Join(", ", setClauses));
+            sql.Append($" WHERE {primaryKeyProperty.Name} = @p{parameters.Count};");
+
+            using (SqlConnection connection = new SqlConnection(GetSqlConnectionString()))
+            {
+                using (SqlCommand command = new SqlCommand(sql.ToString(), connection))
+                {
+                    for (int i = 0; i < parameters.Count; i++)
+                    {
+                        command.Parameters.AddWithValue("@p" + i, parameters[i]);
+                    }
+
+                    command.Parameters.AddWithValue("@p" + parameters.Count, primaryKeyValue);
+
+                    try
+                    {
+                        connection.Open();
+                        Result = command.ExecuteNonQuery();
+                        if (Result < 0)
+                        {
+                            Console.WriteLine("Noget gik galt under Save operationen !!!");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Exception occurred: {ex.Message}");
+                    }
+                }
+            }
+
+            return Result;
+        }
+        
+        public static List<T> GetData<T>(string tableName)
+        {
+            List<T> resultList = new List<T>();
+            Type type = typeof(T);
+            PropertyInfo[] properties = type.GetProperties();
+
+            StringBuilder sql = new StringBuilder();
+            sql.Append($"SELECT * FROM {tableName};");
+
+            using (SqlConnection connection = new SqlConnection(GetSqlConnectionString()))
+            {
+                using (SqlCommand command = new SqlCommand(sql.ToString(), connection))
+                {
+                    try
+                    {
+                        connection.Open();
+                        using (SqlDataReader reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                T obj = Activator.CreateInstance<T>();
+                                foreach (var property in properties)
+                                {
+                                    if (reader[property.Name] != DBNull.Value)
+                                    {
+                                        property.SetValue(obj, reader[property.Name]);
+                                    }
+                                }
+                                resultList.Add(obj);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Exception occurred: {ex.Message}");
+                    }
+                }
+                connection.Close();
+            }
+
+            return resultList;
         }
 
         private static void OpenDatabaseConnection()
@@ -121,14 +249,10 @@ namespace Entities.Models
 
         private static string GetSqlConnectionString()
         {
-            // Prepare the connection string to Azure SQL Database.
             var sqlConnectionSB = new SqlConnectionStringBuilder
             {
-                // Change these values to your values.
                 DataSource = "(localdb)\\mssqllocaldb", 
-                InitialCatalog = "Student_WebApi_Core_8_0",         
-                UserID = "ltpe2",                                   
-                Password = "buchwald34",
+                InitialCatalog = "Student_WebApi_Core_8_0", 
                 TrustServerCertificate = true,
             };
             return sqlConnectionSB.ToString();
