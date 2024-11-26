@@ -47,7 +47,7 @@ namespace Student_WebApi_ADO_NET.Controllers
             }
             catch (Exception Error)
             {
-                _logger.LogError($"Something went wrong inside CreateStudent_ADO_Net_Reflection action for {UserName}: {Error.Message}");
+                _logger.LogError($"Noget gik galt med CreateStudent_ADO_Net_Reflection action for {UserName}: {Error.Message}");
                 return StatusCode((int)HttpStatusCode.InternalServerError, $"Internal server error : {Error.ToString()}");
             }
         }
@@ -73,7 +73,7 @@ namespace Student_WebApi_ADO_NET.Controllers
             }
             catch (Exception Error)
             {
-                _logger.LogError($"Something went wrong inside DeleteStudent_ADO_Net_Reflection action for {UserName}: {Error.Message}");
+                _logger.LogError($"Noget gik galt med DeleteStudent_ADO_Net_Reflection action for {UserName}: {Error.Message}");
                 return StatusCode((int)HttpStatusCode.InternalServerError, $"Internal server error : {Error.ToString()}");
             }
         }
@@ -106,32 +106,34 @@ namespace Student_WebApi_ADO_NET.Controllers
             }
             catch (Exception Error)
             {
-                _logger.LogError($"Something went wrong inside UpdateStudent_ADO_Net_Reflection action for {UserName}: {Error.Message}");
+                _logger.LogError($"Noget gik galt med UpdateStudent_ADO_Net_Reflection action for {UserName}: {Error.Message}");
                 return StatusCode((int)HttpStatusCode.InternalServerError, $"Internal server error : {Error.ToString()}");
             }
         }
         
         // GET: api/Student
-        [HttpGet("GetData_ADO_Net_Reflection")]
-        public async Task<IActionResult> GetData_ADO_Net_Reflection(string UserName = "No Name")
+        [HttpGet("GetStudents_ADO_Net_Reflection")]
+        public async Task<IActionResult> GetStudents_ADO_Net_Reflection(string UserName = "No Name")
         {
             try
             {
-                List<Student> students = OrmReflection.GetData<Student>(Student.TABLE_NAME);
+                List<Student> students = OrmReflection.GetData<Student>("dbo.Core_8_0_Students");
 
-                if (students != null && students.Count > 0)
+                if (students.Count > 0)
                 {
-                    return Ok(new { message = $"Der blev fundet {students.Count} studerende i databasen.", data = students });
+                    return Ok(students);
                 }
                 else
                 {
-                    return NotFound("Ingen studerende blev fundet.");
+                    return NotFound("Ingen students fundet.");
                 }
             }
             catch (Exception Error)
             {
-                _logger.LogError($"Noget gik galt i GetData_ADO_Net_Reflection action for {UserName}: {Error.Message}");
-                return StatusCode((int)HttpStatusCode.InternalServerError, $"Intern serverfejl: {Error.ToString()}");
+                _logger.LogError(
+                    $"Noget gik galt med GetStudents_ADO_Net_Reflection action for {UserName}: {Error.Message}");
+                return StatusCode((int)HttpStatusCode.InternalServerError,
+                    $"Internal server error : {Error.ToString()}");
             }
         }
     }

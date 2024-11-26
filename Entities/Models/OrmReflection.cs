@@ -20,12 +20,11 @@ namespace Entities.Models
             int Result = 0;
             Type type = typeof(T);
 
-            // Get all public instance properties
             PropertyInfo[] properties = type.GetProperties();
 
-            PropertyInfo primaryKeyProperty = properties.FirstOrDefault(p => p.GetCustomAttributes(typeof(KeyAttribute), true).Length > 0);
+            PropertyInfo primaryKeyProperty =
+                properties.FirstOrDefault(p => p.GetCustomAttributes(typeof(KeyAttribute), true).Length > 0);
 
-            // Create a SQL INSERT statement
             StringBuilder sql = new StringBuilder();
             sql.Append($"INSERT INTO {tableName} (");
 
@@ -33,7 +32,8 @@ namespace Entities.Models
             List<object> parameters = new List<object>();
             foreach (PropertyInfo property in properties)
             {
-                if (property != primaryKeyProperty && (property.PropertyType.IsPrimitive || property.PropertyType == typeof(string)))
+                if (property != primaryKeyProperty &&
+                    (property.PropertyType.IsPrimitive || property.PropertyType == typeof(string)))
                 {
                     columnNames.Add(property.Name);
                     parameters.Add(property.GetValue(obj));
@@ -61,6 +61,7 @@ namespace Entities.Models
                         Console.WriteLine("Noget gik galt under Save operationen !!!");
                     }
                 }
+
                 connection.Close();
             }
 
@@ -74,7 +75,8 @@ namespace Entities.Models
 
             PropertyInfo[] properties = type.GetProperties();
 
-            PropertyInfo primaryKeyProperty = properties.FirstOrDefault(p => p.GetCustomAttributes(typeof(KeyAttribute), true).Length > 0);
+            PropertyInfo primaryKeyProperty =
+                properties.FirstOrDefault(p => p.GetCustomAttributes(typeof(KeyAttribute), true).Length > 0);
             if (primaryKeyProperty == null)
             {
                 Console.WriteLine("Ingen primary key fundet !");
@@ -124,7 +126,8 @@ namespace Entities.Models
 
             PropertyInfo[] properties = type.GetProperties();
 
-            PropertyInfo primaryKeyProperty = properties.FirstOrDefault(p => p.GetCustomAttributes(typeof(KeyAttribute), true).Length > 0);
+            PropertyInfo primaryKeyProperty =
+                properties.FirstOrDefault(p => p.GetCustomAttributes(typeof(KeyAttribute), true).Length > 0);
             if (primaryKeyProperty == null)
             {
                 Console.WriteLine("Ingen primary key fundet !");
@@ -145,7 +148,8 @@ namespace Entities.Models
             List<object> parameters = new List<object>();
             foreach (PropertyInfo property in properties)
             {
-                if (property != primaryKeyProperty && (property.PropertyType.IsPrimitive || property.PropertyType == typeof(string)))
+                if (property != primaryKeyProperty &&
+                    (property.PropertyType.IsPrimitive || property.PropertyType == typeof(string)))
                 {
                     setClauses.Add($"{property.Name} = @p{parameters.Count}");
                     parameters.Add(property.GetValue(obj));
@@ -184,15 +188,16 @@ namespace Entities.Models
 
             return Result;
         }
-        
+
         public static List<T> GetData<T>(string tableName)
         {
             List<T> resultList = new List<T>();
             Type type = typeof(T);
-            PropertyInfo[] properties = type.GetProperties();
 
             StringBuilder sql = new StringBuilder();
-            sql.Append($"SELECT * FROM {tableName};");
+            sql.Append($"SELECT * FROM {tableName}");
+
+            Console.WriteLine($"Executing query: {sql.ToString()}");
 
             using (SqlConnection connection = new SqlConnection(GetSqlConnectionString()))
             {
@@ -206,25 +211,32 @@ namespace Entities.Models
                             while (reader.Read())
                             {
                                 T obj = Activator.CreateInstance<T>();
+                                PropertyInfo[] properties = type.GetProperties();
+
                                 foreach (var property in properties)
                                 {
-                                    if (reader[property.Name] != DBNull.Value)
+                                    if (property.PropertyType.IsGenericType || property.PropertyType.IsClass)
                                     {
-                                        property.SetValue(obj, reader[property.Name]);
+                                        continue;
+                                    }
+
+                                    if (!reader.IsDBNull(reader.GetOrdinal(property.Name)))
+                                    {
+                                        object value = reader[property.Name];
+                                        property.SetValue(obj, value);
                                     }
                                 }
+
                                 resultList.Add(obj);
                             }
                         }
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Exception occurred: {ex.Message}");
+                        Console.WriteLine($"Error occurred while fetching data: {ex.Message}");
                     }
                 }
-                connection.Close();
             }
-
             return resultList;
         }
 
@@ -251,8 +263,8 @@ namespace Entities.Models
         {
             var sqlConnectionSB = new SqlConnectionStringBuilder
             {
-                DataSource = "(localdb)\\mssqllocaldb", 
-                InitialCatalog = "Student_WebApi_Core_8_0", 
+                DataSource = "(localdb)\\mssqllocaldb",
+                InitialCatalog = "Student_WebApi_Core_8_0",
                 TrustServerCertificate = true,
             };
             return sqlConnectionSB.ToString();
